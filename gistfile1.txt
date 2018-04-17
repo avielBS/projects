@@ -1,5 +1,8 @@
 import logging
-
+""" 
+a directed graph , CPM , PERT , calculate slack time, find the critical path, show the cycle path in graph if exist
+using logger just for exapmle
+"""
 
 class Graph(object):
 
