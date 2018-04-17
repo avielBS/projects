@@ -1,0 +1,301 @@
+import logging
+
+
+class Graph(object):
+
+    def __init__(self, graph_dict=None):
+
+        """ initializes a graph object
+            If no dictionary or None is given, an empty dictionary will be used
+        """
+        if graph_dict == None:
+            graph_dict = {}
+        self.__graph_dict = graph_dict
+
+        logging.info('the graph is Initialized')
+
+    @property
+    def duration(self):
+        """calculate the longest path in graph"""
+
+        def calculate_duration_time(path):
+            '''calculate the duration time of project by the critical path'''
+
+            maxDuration = 0
+            for i in path:
+                maxDuration += i[2]
+            logging.info('duration of this path %s is %s :' % (path, maxDuration))
+            return maxDuration
+        """calculate the duration of specific path """
+
+        all_paths = []
+        duration_list = []
+        graph = self.__graph_dict
+
+        for vertex in graph.keys():
+            for another_vertex in graph.keys():
+                all_paths.append(self.find_critical_path(vertex, another_vertex))
+                """ a list of all paths in graph"""
+
+        for path in all_paths:
+            duration_list.append(calculate_duration_time(path))
+
+        return max(duration_list)
+
+    def __generate_edges(self):
+        """ A static method generating the edges of the
+            graph "graph". Edges are represented as sets
+            with one (a loop back to the vertex) or two
+            vertices
+        """
+        edges = []
+        for activity in self.__graph_dict:
+            for neighbour in self.__graph_dict[activity]:
+                if {neighbour, activity} not in edges:
+                    edges.append({activity, neighbour})
+
+        logging.info('generate activities edges in the graph')
+        return edges
+
+    def __str__(self):
+        counter = 0
+        res = "vertices: "
+        for k in self.__graph_dict:
+            res += str(k) + " "
+        res += "\nedges: "
+        for edge in self.__generate_edges():
+            if counter % 5 == 0:
+                res += "\n"
+            res += str(edge) + ","
+            counter += 1
+        logging.info('print graph')
+        return res
+
+    def add_activity(self, name, duration):
+        """ If the name is not in
+            self.__graph_dict, a key name with an empty
+            list as a value is added to the dictionary.
+            Otherwise adding to this key his new duration.
+        """
+        if name not in self.__graph_dict.keys():
+            self.__graph_dict[name] = []
+        self.__graph_dict[name].append(duration)
+
+        logging.info('user add activity name: %s and duration %s to graph' % (name, duration))
+
+    def remove_activity(self, name, duration):
+        """
+        if name not in graph.dict the is no activity to delete
+        otherwise removing the name of this activity and all the edges that related to this name
+        """
+
+        if name not in self.__graph_dict.keys():
+            logging.info('there is no activity name: %s in graph to remove' % name)
+            return ''' the activity not exist '''
+
+        self.__graph_dict.pop(name)
+
+        for i in self.__graph_dict.keys():
+            if duration in self.__graph_dict[i]:
+                self.__graph_dict[i].remove(duration)
+                if self.__graph_dict[i] == None:
+                    self.__graph_dict[i] = []
+
+        logging.info('user remove activity name: %s from graph' % name)
+
+    def cycle(self, start, end):
+        logging.info('search from cycle in graph')
+
+        def find_all_paths(start_vertex, end_vertex, path=[]):
+            """ find all paths from start_vertex to
+                end_vertex in graph include those who have duplicate vertex """
+            graph = self.__graph_dict
+            path = path + [start_vertex]
+            paths = []
+
+            for i in graph.keys():
+                if path.count(i) > 1:
+                    paths.append(path)
+                    return paths
+
+            if start_vertex == end_vertex:
+                return [path]
+            if start_vertex not in graph:
+                return []
+
+            for vertex in graph[start_vertex]:
+                if path.count(vertex[0]) < 2:
+                    extended_paths = find_all_paths(vertex[0],
+                                                    end_vertex,
+                                                    path)
+                    for p in extended_paths:
+                        paths.append(p)
+
+            logging.info('cycle inner function return all paths')
+            return paths
+
+        stack = []
+        stack = (find_all_paths(start, end, stack))
+        loop_stack = []
+        """ take from all paths list only the values that contains at least 2 same vertex -> cycle """
+        for list in stack:
+            for key in self.__graph_dict.keys():
+                if list.count(key) > 1:
+                    loop_stack.append(list)
+
+        logging.info('cycle return list of all cycles in graph')
+        print(loop_stack)
+
+    def find_isolated_activities(self):
+        """ returns a list of isolated vertices. """
+        graph = self.__graph_dict
+        isolated = []
+        for vertex in graph.keys():
+            if not graph[vertex] or len(graph[vertex][0]) == 0:
+                isolated.append(vertex)
+        """ isolated has only vertices that not pointing anyone """
+
+        for vertex in graph.keys():
+            for task in graph[vertex]:
+                for isolate in isolated:
+                    if isolate in task:
+                        isolated.remove(isolate)
+
+        logging.info('return isolated activities %s' % isolated)
+        return isolated
+
+    def find_critical_path(self, start, end):
+
+        def find_all_paths(start_vertex, end_vertex, path=[]):
+            """ find all paths from start_vertex to
+                end_vertex in graph """
+            graph = self.__graph_dict
+            path = path + [start_vertex]
+            if start_vertex == end_vertex:
+                return [path]
+            if start_vertex not in graph:
+                return []
+            paths = []
+            for vertex in graph[start_vertex]:
+                if vertex[0] not in path:
+                    extended_paths = find_all_paths(vertex[0],
+                                                    end_vertex,
+                                                    path)
+                    for p in extended_paths:
+                        paths.append(p)
+            return paths
+
+        paths = find_all_paths(start, end)
+        critical_path = []
+        max_duration = 0
+
+        for path in paths:
+            vertex_index = 0
+            current_length = 0
+            temp_list = []
+            for vertex in path[:-1]:
+                vertex_index += 1
+                for i in range(len(self.__graph_dict[vertex])):
+                    if path[vertex_index] in self.__graph_dict[vertex][i]:
+                        temp_list.append([path[vertex_index - 1], path[vertex_index], self.__graph_dict[vertex][i][2]])
+                        current_length += self.__graph_dict[vertex][i][2]
+
+            if current_length > max_duration:
+                critical_path = temp_list
+                max_duration = current_length
+
+        logging.info('return critical path ')
+        logging.info('max duration of this critical path from %s to %s is %s ' % (start, end, critical_path))
+
+        return critical_path
+
+    def calculate_duration_time(self, start, end):
+        """ calculate the duration time of project by the critical path """
+        c_path = self.find_critical_path(start, end)
+        maxuration = 0
+        for i in c_path:
+            maxuration += i[2]
+        logging.info('print critical path and return duration %d :' % maxuration)
+        return maxuration
+
+    def slack_time(self, start, end):
+
+        def reverse_graph():
+            graph = self.__graph_dict
+            activities = graph.keys()
+
+            reverse_graph = {}
+            for active in activities:
+                reverse_graph[active] = []
+
+            for vertex in activities:
+                for edge in graph[vertex]:
+                    reverse_graph[edge[0]].append((vertex, edge[1], edge[2]))
+
+            return reverse_graph
+
+        graph = self.__graph_dict
+        activities = graph.keys()
+        reverse_graph = Graph(reverse_graph())
+        critacl_path = self.duration
+        slack_time_list = []
+
+        for vertex in activities:
+            longest_path_from_end_to_vertex = reverse_graph.calculate_duration_time(end, vertex)
+            lastest_completion_time = critacl_path - longest_path_from_end_to_vertex
+
+            longest_path_from_start_to_vertex = self.calculate_duration_time(start, vertex)
+
+            slack_time_list.append((vertex, lastest_completion_time - longest_path_from_start_to_vertex))
+
+        logging.info('print slack time list %s' % slack_time_list)
+        slack_time_list = [i for i in slack_time_list if i[1] != 0]
+        slack_time_list.sort(key=lambda tup: tup[1], reverse=True)
+        print(slack_time_list)
+
+
+if __name__ == "__main__":
+    g = {
+        'start': [('A', 'Task1', 4), ('B', 'Task5', 6), ('C1', 'Task9', 5)],
+        'A': [('B', None, 0)],
+        'B': [('D', 'Task2', 2)],
+        'C1': [('C2', 'Task6', 4)],
+        'C2': [('End', 'Task7', 6)],
+        'D': [('F', 'Task3', 2), ('End', 'Task10', 8), ('E', 'Task8', 5), ('C1', None, 0), ('C2', None, 0)],
+        'E': [('End', 'Task4', 5), ('C2', None, 0)],
+        'F': [('End', None, 0)],
+        'End': []
+    }
+
+logging.basicConfig(filename='Pert.log', level=logging.INFO)
+
+graph = Graph(g)
+print('\nprint the graph: ')
+print(graph, "\n")
+
+print('adding activity T to graph with duration (X,task,11) ')
+graph.add_activity('T', ('X', 'task', 11))
+print(graph, "\n")
+
+print('removing activity T from graph with duration (X,task,11)  ')
+graph.remove_activity('T', ('X', 'task', 11))
+print(graph, '\n')
+
+print('finding the critical path in graph : ')
+print(graph.find_critical_path('start', 'End'), '\nthe duration is :', graph.duration, '\n')
+
+print('print the slack time for each activity in graph')
+graph.slack_time('start', 'End')
+
+print('\nadding activity from E to start with duration (start,cycleTask,10) to check the cycle function')
+graph.add_activity('E', ('start', 'cycleTask', 10))
+
+print('search cycle in graph from start to end ')
+graph.cycle('start', 'End')
+
+print('\nadd activity x with empty duration no one point x and x pointing no one -> isolated activity')
+graph.add_activity('x', ())
+print("the isolated list activities in graph is : ", graph.find_isolated_activities(), "\n", graph)
+
+graph.remove_activity('x', ())
+print('\n after removing x vertex the graph is ', graph)
